@@ -26,7 +26,12 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'outside.txt').write_text('private')
-            (root / 'README.md').symlink_to(root / 'outside.txt')
+            try:
+                (root / 'README.md').symlink_to(root / 'outside.txt')
+            except OSError as exc:
+                if getattr(exc, 'winerror', None) == 1314:
+                    self.skipTest('Windows symlink privilege is unavailable; release symlink guard is covered on capable platforms.')
+                raise
             with self.assertRaises(ValueError):
                 release.selected(root)
 

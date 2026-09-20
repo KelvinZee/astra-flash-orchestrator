@@ -1,6 +1,8 @@
 # Astra Flash Orchestrator
 
-**Save Astra for the decisions that need it. Let DeepSeek V4.1 Flash do the volume.**
+> **Kelvin fork note:** this branch defaults the worker to native `gpt-5.6-luna` at `high` effort because that route is currently published as native-subagent v2 under ChatGPT-authenticated Codex. The installer now accepts `--worker-model` and `--worker-effort`; alternate workers must already advertise `multi_agent_version: "v2"`. The legacy skill and role names remain unchanged for compatibility. DeepSeek figures below are retained as historical benchmark data, not the current default binding.
+
+**Save Astra for the decisions that need it. Let a pinned native-v2 worker do the implementation volume.**
 
 ![Astra Flash Orchestrator measured efficiency](docs/assets/astra-savings-v2.svg)
 
@@ -85,8 +87,8 @@ Before installing, you need:
 1. A Codex client that supports native subagents and standalone custom agent TOML files under `$CODEX_HOME/agents/`.
 2. GPT-6 Astra selected as the root model.
 3. Python **3.11 or newer**. No third-party Python dependencies are needed.
-4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router), configured and authenticated for the exact route `deepseek/deepseek-v4.1-flash`.
-5. A local Codex model catalog advertising that route with `multi_agent_version: "v2"`.
+4. An existing [Codex Router installation](https://github.com/duolahypercho/codex-router) with the requested worker route visible in the effective catalog.
+5. A local Codex model catalog advertising that exact worker with `multi_agent_version: "v2"`. This fork defaults to native `gpt-5.6-luna` at `high` effort.
 
 Do **not** add or change `[agents].default_subagent_model` for this package. The
 installer creates a named `astra_flash_builder` role that pins its own model and
@@ -149,7 +151,7 @@ For a nondefault profile, pass `--profile PROFILE` to the dry run, apply and doc
 | Location | Installed content |
 | --- | --- |
 | `~/.agents/skills/astra-flash-orchestrator/` | Skill, references, templates, doctor, plan validator and routing binding |
-| `$CODEX_HOME/agents/astra_flash_builder.toml` | Native builder pinned to Flash; nested agents disabled |
+| `$CODEX_HOME/agents/astra_flash_builder.toml` | Native builder pinned to the selected v2 worker; nested agents disabled |
 | `$CODEX_HOME/AGENTS.md` | A marked, scoped workflow policy block |
 | `$CODEX_HOME/astra-flash-install-backups/` | Original files and an undo receipt |
 

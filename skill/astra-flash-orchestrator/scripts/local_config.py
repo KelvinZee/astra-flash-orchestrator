@@ -14,7 +14,10 @@ if sys.version_info < (3, 11):
     raise SystemExit("Python 3.11+ is required. No packages or settings were changed.")
 import tomllib
 
-ROUTE = "deepseek/deepseek-v4.1-flash"
+DEFAULT_WORKER_MODEL = "gpt-5.6-luna"
+DEFAULT_WORKER_EFFORT = "high"
+# Backward-compatible alias used by the test fixtures and older integrations.
+ROUTE = DEFAULT_WORKER_MODEL
 ROLE = "astra_flash_builder"
 SKILL = "astra-flash-orchestrator"
 
@@ -83,7 +86,13 @@ def model_id(entry: dict) -> str | None:
     return entry.get("slug") or entry.get("id")
 
 
-def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[dict, str]:
+def inspect(
+    home: Path,
+    codex_home: Path,
+    profile: str | None = None,
+    worker_model: str | None = None,
+    worker_effort: str | None = None,
+) -> tuple[dict, str]:
     """Return a redacted static report and a PRIVATE local URL. Do not print URL."""
     config_path = codex_home / "config.toml"
     config = read_toml(config_path)
@@ -132,8 +141,15 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         warnings.append(
             "The global default_subagent_model is not used or changed; the installed named role pins its own worker model."
         )
-    if config.get("model") == ROUTE:
-        raise SetupError("The root model is Flash. Select Astra as root before installing this workflow.")
+    requested_model = worker_model or os.environ.get("ASTRA_WORKER_MODEL") or DEFAULT_WORKER_MODEL
+    requested_effort = worker_effort or os.environ.get("ASTRA_WORKER_EFFORT") or DEFAULT_WORKER_EFFORT
+    if not isinstance(requested_model, str) or not requested_model.strip() or not re.fullmatch(r"[A-Za-z0-9._/-]+", requested_model):
+        raise SetupError("The requested worker model id is invalid.")
+    requested_model = requested_model.strip()
+    if requested_effort is not None and (not isinstance(requested_effort, str) or not re.fullmatch(r"[a-z_]+", requested_effort)):
+        raise SetupError("The requested worker reasoning effort is invalid.")
+    if config.get("model") == requested_model:
+        raise SetupError("The root model and implementation worker are the same. Select Astra as root or choose a different worker.")
 
     catalog_value = config.get("model_catalog_json")
     if not isinstance(catalog_value, str) or not catalog_value:
@@ -145,29 +161,33 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         payload = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeError) as exc:
         raise SetupError(f"Cannot read the configured model catalog ({type(exc).__name__}).") from None
-    matches = [entry for entry in model_entries(payload) if model_id(entry) == ROUTE]
+    matches = [entry for entry in model_entries(payload) if model_id(entry) == requested_model]
     if len(matches) != 1:
-        raise SetupError("Flash V4.1 is missing or duplicated in the local catalog. Use the router's own repair process.")
+        raise SetupError(
+            f"The requested worker model {requested_model!r} is missing or duplicated in the local catalog. "
+            "Use the router's own repair/publish process or choose another worker with --worker-model."
+        )
     entry = matches[0]
     if entry.get("multi_agent_version") != "v2":
         raise SetupError(
-            "Flash exists in the catalog but is not advertised for native subagents "
-            "(multi_agent_version must be v2). Select this exact route using your "
-            "Router's documented subagent settings, republish the catalog, and fully "
-            "quit/reopen the host app. Selection is not runtime verification. "
-            "Some Router enable commands launch paid probes; review them before use."
+            f"The requested worker {requested_model!r} exists but is not advertised for native subagents "
+            "(multi_agent_version must be v2). Do not edit the catalog to bypass this gate. "
+            "Choose a repository-certified/local-verified v2 worker, or wait for this exact route to become v2."
         )
     levels = entry.get("supported_reasoning_levels", [])
     supported = [x.get("effort") if isinstance(x, dict) else x for x in levels] if isinstance(levels, list) else []
     # The named role owns both worker settings. Do not couple installation to,
     # inherit, or encourage mutation of global defaults used by unrelated agents.
-    effort = entry.get("default_reasoning_level")
+    effort = requested_effort or entry.get("default_reasoning_level")
     if effort is not None and (not isinstance(effort, str) or not re.fullmatch(r"[a-z_]+", effort)):
         raise SetupError("The worker reasoning effort is not a recognized string value.")
     if effort is not None and supported and effort not in supported:
-        raise SetupError("The worker effort does not match its catalog's supported efforts. Reconcile it locally first.")
+        raise SetupError(
+            f"The requested worker effort {effort!r} is not supported by {requested_model!r}. "
+            f"Supported efforts: {', '.join(str(x) for x in supported)}."
+        )
     if effort is None:
-        warnings.append("No worker effort was pinned; use explicit model selection without an effort at spawn, then inspect the actual thread.")
+        warnings.append("No worker effort was pinned; inspect the actual spawned thread before relying on it.")
 
     provider = config.get("model_provider", "openai")
     if provider == "openai":
@@ -200,7 +220,7 @@ def inspect(home: Path, codex_home: Path, profile: str | None = None) -> tuple[d
         "inference_request_made": False,
         "root_model_observed": config.get("model"),
         "root_effort_observed": config.get("model_reasoning_effort"),
-        "worker_model": ROUTE,
+        "worker_model": requested_model,
         "worker_effort": effort,
         "custom_agent": ROLE,
         "profile_inspected": selected,

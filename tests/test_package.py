@@ -139,6 +139,18 @@ class SetupFixture(unittest.TestCase):
         with self.assertRaises(SetupError):
             self.report()
 
+    def test_worker_model_and_effort_can_be_overridden(self):
+        alternate = 'fixture/alternate-v2'
+        self.catalog.write_text(json.dumps({'models': [{
+            'slug': alternate,
+            'multi_agent_version': 'v2',
+            'default_reasoning_level': 'low',
+            'supported_reasoning_levels': [{'effort': 'low'}, {'effort': 'high'}],
+        }]}))
+        result, _ = inspect(self.home, self.codex, worker_model=alternate, worker_effort='low')
+        self.assertEqual(result['worker_model'], alternate)
+        self.assertEqual(result['worker_effort'], 'low')
+
     def test_non_spawnable_catalog_route_blocks_install(self):
         payload = json.loads(self.catalog.read_text())
         for value in ['v1', None]:
@@ -292,7 +304,12 @@ class SetupFixture(unittest.TestCase):
     def test_symlink_destination_is_refused(self):
         external = self.home / 'external'
         external.mkdir()
-        (self.home / '.agents').symlink_to(external, target_is_directory=True)
+        try:
+            (self.home / '.agents').symlink_to(external, target_is_directory=True)
+        except OSError as exc:
+            if getattr(exc, 'winerror', None) == 1314:
+                self.skipTest('Windows symlink privilege is unavailable; installer symlink guard is covered on capable platforms.')
+            raise
         with self.assertRaises(SetupError):
             self.changes()
 
