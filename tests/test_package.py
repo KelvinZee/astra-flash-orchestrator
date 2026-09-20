@@ -292,7 +292,12 @@ class SetupFixture(unittest.TestCase):
     def test_symlink_destination_is_refused(self):
         external = self.home / 'external'
         external.mkdir()
-        (self.home / '.agents').symlink_to(external, target_is_directory=True)
+        try:
+            (self.home / '.agents').symlink_to(external, target_is_directory=True)
+        except OSError as exc:
+            if getattr(exc, 'winerror', None) == 1314:
+                self.skipTest('Windows symlink privilege is unavailable; installer symlink guard is covered on capable platforms.')
+            raise
         with self.assertRaises(SetupError):
             self.changes()
 
