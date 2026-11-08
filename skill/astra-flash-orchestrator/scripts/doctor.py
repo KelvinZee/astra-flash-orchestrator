@@ -25,8 +25,9 @@ def check_local_catalog(url: str, worker_model: str) -> None:
         if len(body) > 10_000_000:
             raise SetupError("Local model response exceeded its size limit.")
         entries = model_entries(json.loads(body))
-        if not any(model_id(entry) == worker_model for entry in entries):
-            raise SetupError("The live local catalog does not advertise the requested worker route.")
+        matches = [entry for entry in entries if model_id(entry) == worker_model]
+        if len(matches) != 1 or matches[0].get("multi_agent_version") != "v2":
+            raise SetupError("The live local catalog must advertise exactly one requested worker route with native v2 support.")
     except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeError) as exc:
         raise SetupError(f"Local catalog check failed ({type(exc).__name__}); private URL withheld.") from None
 

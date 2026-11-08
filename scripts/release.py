@@ -8,7 +8,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = {'README.md', 'LICENSE', 'VERSION', 'INSTALL-IN-CODEX.md', 'POLICY.md',
               'WORKER-INSTRUCTIONS.md', 'SOURCES.md', 'CONTRIBUTING.md',
-              'SECURITY.md', 'CHANGELOG.md', '.gitignore', 'install.py'}
+              'SECURITY.md', 'CHANGELOG.md', '.gitignore', '.gitattributes', 'install.py'}
 TREES = {'docs', 'skill', 'examples', 'tests', 'scripts'}
 SUFFIXES = {'.md', '.py', '.json', '.yaml', '.svg'}
 

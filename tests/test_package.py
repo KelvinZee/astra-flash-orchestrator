@@ -371,7 +371,7 @@ class SetupFixture(unittest.TestCase):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 seen.append(self.path)
-                body = json.dumps({'data': [{'id': ROUTE}]}).encode()
+                body = json.dumps({'data': [{'id': ROUTE, 'multi_agent_version': 'v2'}]}).encode()
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
