@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preview/install the Astra + Flash skill without changing Codex model/provider settings."""
+"""Preview/install the Astra orchestration skill without changing Codex model/provider settings."""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -18,7 +18,7 @@ sys.dont_write_bytecode = True
 BUNDLE = Path(__file__).resolve().parent
 SKILL_SOURCE = BUNDLE / "skill" / "astra-flash-orchestrator"
 sys.path.insert(0, str(SKILL_SOURCE / "scripts"))
-from local_config import SetupError, default_locations, inspect, ROLE, SKILL
+from local_config import SetupError, default_locations, inspect, ROLE, SKILL, DEFAULT_WORKER_MODEL, DEFAULT_WORKER_EFFORT
 
 BEGIN = b"<!-- BEGIN astra-flash-orchestrator managed policy -->"
 END = b"<!-- END astra-flash-orchestrator managed policy -->"
@@ -97,7 +97,7 @@ def plan_changes(home: Path, codex_home: Path, report: dict, with_policy: bool, 
     # JSON basic strings are valid TOML basic strings for these generated values.
     role = (
         f'name = {json.dumps(ROLE)}\n'
-        'description = "Implement an Astra-approved task bundle using the installed Flash route; never orchestrate or self-approve."\n'
+        'description = "Implement an Astra-approved task bundle using the installed worker route; never orchestrate or self-approve."\n'
         f'model = {json.dumps(report["worker_model"])}\n'
     )
     if report["worker_effort"]:
@@ -222,6 +222,8 @@ def main() -> int:
     parser.add_argument("--home", help="override HOME (primarily for isolated tests)")
     parser.add_argument("--codex-home", help="override CODEX_HOME")
     parser.add_argument("--profile", help="inspect a specific existing profile; does not change profile selection")
+    parser.add_argument("--worker-model", default=None, help=f"native v2 worker model to pin (default: {DEFAULT_WORKER_MODEL})")
+    parser.add_argument("--worker-effort", default=None, help=f"reasoning effort for the worker (default: {DEFAULT_WORKER_EFFORT})")
     parser.add_argument("--undo", type=Path, metavar="RECEIPT", help="preview restoration from an installation receipt; combine with --apply to restore")
     args = parser.parse_args()
     try:
@@ -229,7 +231,7 @@ def main() -> int:
         if args.undo:
             undo(args.undo, home, codex_home, args.apply)
             return 0
-        report, _private_url = inspect(home, codex_home, args.profile)
+        report, _private_url = inspect(home, codex_home, args.profile, args.worker_model, args.worker_effort)
         changes = plan_changes(home, codex_home, report, not args.no_policy, args.replace)
         print(json.dumps(report, indent=2))
         for change in changes:
